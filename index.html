@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101722"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="在 iPhone 上实时读取摄像头并进行 OpenCV 图像处理">
+  <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon.svg">
+  <title>手机图像实验室</title>
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="opencvLoaded()" onerror="opencvFailed()"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#0b111a;--panel:#141e2b;--muted:#93a4b8;--line:#243244;--cyan:#42d6c5;--blue:#729cff}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#172c3d 0,transparent 42%),var(--bg);color:#f3f7fc;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;padding:env(safe-area-inset-top) 16px calc(18px + env(safe-area-inset-bottom))}
+    main{max-width:980px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;padding:14px 2px 18px}.eyebrow{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--cyan);font-weight:700}.title{font-size:24px;font-weight:750;margin:4px 0 0}.state{font-size:11px;color:var(--muted);padding:7px 10px;border:1px solid var(--line);border-radius:30px}.led{display:inline-block;width:7px;height:7px;background:#738397;border-radius:50%;margin-right:6px}.led.on{background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.card{background:linear-gradient(150deg,#172333,#111a26);border:1px solid var(--line);border-radius:18px;padding:12px;min-width:0;box-shadow:0 10px 30px #0002}.cardhead{display:flex;align-items:center;justify-content:space-between;margin:0 0 9px;font-size:12px;font-weight:650;color:#dce7f4}.tag{font-size:10px;color:var(--muted);font-weight:500}.frame{aspect-ratio:4/3;background:#05080c;border-radius:12px;overflow:hidden;display:grid;place-items:center;position:relative}.frame video,.frame canvas{width:100%;height:100%;object-fit:cover}#output{object-fit:contain}.placeholder{position:absolute;inset:0;display:grid;place-items:center;color:#77879b;font-size:12px;text-align:center;padding:16px;pointer-events:none}.controls{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:14px}.selectwrap{position:relative}.selectwrap:after{content:"⌄";position:absolute;right:13px;top:50%;transform:translateY(-55%);color:var(--cyan);pointer-events:none}.selectwrap select{appearance:none;width:100%;border:1px solid var(--line);background:#131f2d;color:#f2f7fb;border-radius:12px;padding:13px 36px 13px 13px;font:inherit;outline:none}.button{border:0;border-radius:12px;background:linear-gradient(135deg,#47dec9,#42b9d9);color:#062026;padding:13px 16px;font:700 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-width:94px;cursor:pointer}.button.secondary{background:#26374a;color:#ecf4fc}.button:disabled{opacity:.45}.subrow{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11px;margin-top:10px;min-height:16px}.hist{margin-top:12px;display:none}.hist.visible{display:block}.hist canvas{width:100%;height:100px;border:1px solid var(--line);background:#0c141f;border-radius:11px}.histlabels{display:flex;justify-content:space-between;color:#8092a7;font-size:10px;margin:4px 2px 0}.foot{margin:13px 4px 0;color:#8293a7;font-size:11px;line-height:1.55}.foot strong{color:#b6c4d4;font-weight:600}
+    @media(max-width:520px){body{padding-left:12px;padding-right:12px}.grid{gap:8px}.card{padding:9px;border-radius:15px}.title{font-size:21px}.top{padding-top:9px}.cardhead{font-size:11px}.tag{font-size:9px}.frame{aspect-ratio:3/4}.button{min-width:84px;padding:12px 12px;font-size:13px}.controls{margin-top:11px}}
+  </style>
+</head>
+<body>
+<main>
+  <header class="top"><div><div class="eyebrow">Computer Vision · iPhone</div><h1 class="title">手机图像实验室</h1></div><div class="state"><i id="led" class="led"></i><span id="status">等待启动</span></div></header>
+  <section class="grid">
+    <article class="card"><div class="cardhead"><span>实时摄像头</span><span class="tag">仅本机采集</span></div><div class="frame"><video id="camera" autoplay playsinline muted></video><div id="cameraHint" class="placeholder">点击“启动摄像头”<br>允许 Safari 使用摄像头</div></div><div class="subrow"><span>后置摄像头 · 实时画面</span><span id="size">—</span></div></article>
+    <article class="card"><div class="cardhead"><span>OpenCV 处理结果</span><span id="fps" class="tag">— fps</span></div><div class="frame"><canvas id="output"></canvas><div id="outputHint" class="placeholder">处理结果会显示在这里</div></div><div class="subrow"><span id="modeLabel">灰度</span><span>OpenCV.js</span></div></article>
+  </section>
+  <section class="controls"><div class="selectwrap"><select id="mode" aria-label="选择处理算法">
+    <option value="gray">灰度转换</option><option value="hist">灰度直方图</option><option value="mean">均值滤波</option><option value="median">中值滤波</option><option value="bilateral">双边滤波</option><option value="gaussian">高斯滤波</option><option value="morph">15×15 形态学开运算</option><option value="sobel">Sobel 边缘</option><option value="laplace">Laplace 边缘</option><option value="canny">Canny 边缘</option>
+  </select></div><button id="start" class="button" disabled>加载 OpenCV…</button></section>
+  <section id="histPanel" class="hist"><div class="cardhead"><span>灰度直方图</span><span class="tag">像素数量 / 灰度级</span></div><canvas id="histogram" height="100"></canvas><div class="histlabels"><span>0 · 黑</span><span>灰度值</span><span>255 · 白</span></div></section>
+  <p class="foot"><strong>隐私：</strong>摄像头视频仅在浏览器中处理，不会上传。<br>首次加载 OpenCV.js 需要网络；摄像头权限要求 HTTPS 地址。</p>
+</main>
+<script>
+const video=document.querySelector('#camera'),out=document.querySelector('#output'),ctx=document.createElement('canvas').getContext('2d',{willReadFrequently:true});
+const modeEl=document.querySelector('#mode'),startBtn=document.querySelector('#start'),statusEl=document.querySelector('#status'),led=document.querySelector('#led'),fpsEl=document.querySelector('#fps');
+const cameraHint=document.querySelector('#cameraHint'),outputHint=document.querySelector('#outputHint'),histPanel=document.querySelector('#histPanel'),histCanvas=document.querySelector('#histogram');
+let stream=null,running=false,cvReady=false,lastFpsAt=0,frames=0,lastPaint=0;
+function opencvLoaded(){if(window.cv&&window.cv.Mat){ready()}else{cv['onRuntimeInitialized']=ready}}
+function ready(){cvReady=true;startBtn.disabled=false;startBtn.textContent='启动摄像头';statusEl.textContent='OpenCV 已就绪'}
+function opencvFailed(){statusEl.textContent='OpenCV 加载失败';startBtn.textContent='重试加载';startBtn.disabled=false}
+const names={gray:'灰度转换',hist:'灰度直方图',mean:'均值滤波 5×5',median:'中值滤波 5×5',bilateral:'双边滤波',gaussian:'高斯滤波 5×5',morph:'15×15 形态学开运算',sobel:'Sobel 边缘检测',laplace:'Laplace 边缘检测',canny:'Canny 边缘检测'};
+modeEl.addEventListener('change',()=>{document.querySelector('#modeLabel').textContent=names[modeEl.value];histPanel.classList.toggle('visible',modeEl.value==='hist')});
+startBtn.addEventListener('click',async()=>{if(!cvReady){location.reload();return}if(running){stop();return}try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:640},height:{ideal:480}}});video.srcObject=stream;await video.play();running=true;startBtn.textContent='停止摄像头';cameraHint.style.display='none';outputHint.style.display='none';led.classList.add('on');statusEl.textContent='正在实时处理';processLoop()}catch(e){statusEl.textContent=e.name==='NotAllowedError'?'请允许摄像头权限':'摄像头启动失败';cameraHint.innerHTML='无法访问摄像头<br>'+e.message;cameraHint.style.display='grid'}});
+function stop(){running=false;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;video.srcObject=null;startBtn.textContent='启动摄像头';led.classList.remove('on');statusEl.textContent='已停止';cameraHint.style.display='grid';cameraHint.innerHTML='点击“启动摄像头”<br>允许 Safari 使用摄像头';outputHint.style.display='grid'}
+function processLoop(now=0){if(!running||video.readyState<2){if(running)requestAnimationFrame(processLoop);return}if(now-lastPaint<65){requestAnimationFrame(processLoop);return}lastPaint=now;
+  const w=Math.min(640,video.videoWidth||640),h=Math.round(w*(video.videoHeight/video.videoWidth||.75));ctx.canvas.width=w;ctx.canvas.height=h;ctx.drawImage(video,0,0,w,h);out.width=w;out.height=h;
+  let src,gray,dst,tmp,kernel;try{src=cv.imread(ctx.canvas);gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);dst=new cv.Mat();const m=modeEl.value;
+    switch(m){case'hist':gray.copyTo(dst);drawHistogram(gray);break;case'mean':cv.blur(gray,dst,new cv.Size(5,5));break;case'median':cv.medianBlur(gray,dst,5);break;case'bilateral':cv.bilateralFilter(gray,dst,9,75,75);break;case'gaussian':cv.GaussianBlur(gray,dst,new cv.Size(5,5),1.2);break;case'morph':kernel=cv.getStructuringElement(cv.MORPH_RECT,new cv.Size(15,15));cv.morphologyEx(gray,dst,cv.MORPH_OPEN,kernel);break;case'sobel':{let gx=new cv.Mat(),gy=new cv.Mat(),ax=new cv.Mat(),ay=new cv.Mat();cv.Sobel(gray,gx,cv.CV_16S,1,0,3);cv.Sobel(gray,gy,cv.CV_16S,0,1,3);cv.convertScaleAbs(gx,ax);cv.convertScaleAbs(gy,ay);cv.addWeighted(ax,.5,ay,.5,0,dst);gx.delete();gy.delete();ax.delete();ay.delete();break}case'laplace':cv.Laplacian(gray,dst,cv.CV_16S,3);cv.convertScaleAbs(dst,dst);break;case'canny':cv.Canny(gray,dst,80,160);break;default:gray.copyTo(dst)}
+    cv.imshow(out,dst);document.querySelector('#size').textContent=w+'×'+h;frames++;if(now-lastFpsAt>1000){fpsEl.textContent=frames+' fps';frames=0;lastFpsAt=now}
+  }catch(e){statusEl.textContent='处理失败：'+e.message;stop()}finally{if(src)src.delete();if(gray)gray.delete();if(dst)dst.delete();if(kernel)kernel.delete()}
+  if(running)requestAnimationFrame(processLoop)
+}
+function drawHistogram(gray){const hist=new cv.Mat(),mask=new cv.Mat();cv.calcHist([gray],[0],mask,hist,[256],[0,256]);let max=1;for(let i=0;i<256;i++)max=Math.max(max,hist.data32F[i]);const c=histCanvas.getContext('2d');const dpr=window.devicePixelRatio||1;const box=histCanvas.getBoundingClientRect();if(box.width&&histCanvas.width!==Math.round(box.width*dpr)){histCanvas.width=Math.round(box.width*dpr);histCanvas.height=Math.round(100*dpr)}c.clearRect(0,0,histCanvas.width,histCanvas.height);c.fillStyle='#42d6c5';const barW=histCanvas.width/256;for(let i=0;i<256;i++){const bh=(hist.data32F[i]/max)*(histCanvas.height-8*dpr);c.fillRect(i*barW,histCanvas.height-bh,Math.max(1,barW),bh)}hist.delete();mask.delete()}
+if('serviceWorker'in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script>
+</body></html>

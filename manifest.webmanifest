@@ -1,0 +1,12 @@
+{
+  "name": "手机图像实验室",
+  "short_name": "图像实验室",
+  "description": "iPhone 实时摄像头 OpenCV 图像处理",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b111a",
+  "theme_color": "#101722",
+  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
